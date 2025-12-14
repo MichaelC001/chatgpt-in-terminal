@@ -25,6 +25,8 @@ Dynamic skills: drop a `.py` file into `skills/` exporting `tool` (OpenAI tool s
 
 Mentions/skills: you can surface behaviors via Markdown instructions or executable Python tools. Markdown prompts help guide the model but require an extra reasoning round; Python tools (`tool` + `handle`) run directly and are faster to execute (e.g., `@x` uses the `x_post_thread` tool).
 
+Input routing: the CLI first checks for local commands/mentions and runs them locally (e.g., `@memo ...` executes the memo CLI directly, bypassing the model). Only inputs that aren’t handled locally are sent to the model.
+
 ### Related Projects
 
 [GPTerm implemented in C/C++](https://github.com/Ace-Radom/cGPTerm) by @Ace-Radom
