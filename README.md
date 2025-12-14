@@ -19,6 +19,10 @@ Supports saving chat messages to a JSON file and loading them from the file.
 
 Uses the [gpt-3.5-turbo](https://platform.openai.com/docs/guides/chat/chat-completions-beta) model, which is the same model used by ChatGPT (Free Edition), as default.
 
+Includes a minimal OpenAI tool-calling (“skills”) example: the built-in `get_time` skill returns the current timestamp and can be extended in `gpt_term/main.py` by adding more tool handlers.
+
+Dynamic skills: drop a `.py` file into `skills/` exporting `tool` (OpenAI tool schema) and `handle(**kwargs)` (returns JSON-serializable data). It will be auto-loaded at startup.
+
 ### Related Projects
 
 [GPTerm implemented in C/C++](https://github.com/Ace-Radom/cGPTerm) by @Ace-Radom

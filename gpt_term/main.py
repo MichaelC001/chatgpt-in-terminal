@@ -3,6 +3,7 @@
 import argparse
 import concurrent.futures
 import json
+import importlib.util
 import logging
 import os
 import platform
@@ -46,6 +47,8 @@ data_dir.mkdir(parents=True, exist_ok=True)
 config_path = root_dir / 'config.ini'
 if not config_path.exists():
     config_path.write_text(read_text('gpt_term', 'config.ini'))
+
+skills_dir = root_dir / 'skills'
 
 # 日志记录到 chat.log，注释下面这行可不记录日志
 logging.basicConfig(filename=f'{data_dir}/chat.log', format='%(asctime)s %(name)s: %(levelname)-6s %(message)s',
@@ -128,16 +131,22 @@ class ChatGPT:
         self.credit_used_this_month = 0
         self.credit_plan = ""
 
+        # Simple default skills/tools; will be extended by skills folder loader
+        self.tools = []
+        self.tool_handlers = {}
+        self.register_builtin_tools()
+        self.load_skill_dir()
+
     def add_total_tokens(self, tokens: int):
         self.threadlock_total_tokens_spent.acquire()
         self.total_tokens_spent += tokens
         self.threadlock_total_tokens_spent.release()
 
-    def send_request(self, data):
+    def send_request(self, data, stream=None):
         try:
             with console.status(_("gpt_term.ChatGPT_thinking")):
                 response = requests.post(
-                    self.endpoint, headers=self.headers, data=json.dumps(data), timeout=self.timeout, stream=ChatMode.stream_mode)
+                    self.endpoint, headers=self.headers, data=json.dumps(data), timeout=self.timeout, stream=ChatMode.stream_mode if stream is None else stream)
             # 匹配4xx错误，显示服务器返回的具体原因
             if response.status_code // 100 == 4:
                 error_msg = response.json()['error']['message']
@@ -203,8 +212,9 @@ class ChatGPT:
             finally:
                 return {'role': 'assistant', 'content': reply}
 
-    def process_response(self, response: requests.Response):
-        if ChatMode.stream_mode:
+    def process_response(self, response: requests.Response, stream=None):
+        use_stream = ChatMode.stream_mode if stream is None else stream
+        if use_stream:
             return self.process_stream_response(response)
         else:
             response_json = response.json()
@@ -258,26 +268,36 @@ class ChatGPT:
     def handle(self, message: str):
         try:
             self.messages.append({"role": "user", "content": message})
+            use_stream = ChatMode.stream_mode if not self.tools else False
             data = {
                 "model": self.model,
                 "messages": self.messages,
-                "stream": ChatMode.stream_mode,
+                "stream": use_stream,
                 "temperature": self.temperature
             }
+            if self.tools:
+                data["tools"] = self.tools
+                data["tool_choice"] = "auto"
             log.debug(f"Sending request with model: {self.model}, endpoint: {self.endpoint}")
-            response = self.send_request(data)
+            response = self.send_request(data, stream=use_stream)
             if response is None:
                 self.messages.pop()
                 if self.current_tokens >= self.tokens_limit:
                     console.print(_('gpt_term.tokens_reached'))
                 return
-
-            reply_message = self.process_response(response)
+            reply_message = self.process_response(response, stream=use_stream)
+            final_reply = reply_message
             if reply_message is not None:
-                log.info(f"ChatGPT: {reply_message['content']}")
                 self.messages.append(reply_message)
+                # Handle tool calls if present
+                if "tool_calls" in reply_message:
+                    final_reply = self.handle_tool_calls(reply_message)
+                # Recount tokens after any tool follow-up
                 self.current_tokens = count_token(self.messages)
                 self.add_total_tokens(self.current_tokens)
+
+                if final_reply and 'content' in final_reply:
+                    log.info(f"ChatGPT: {final_reply['content']}")
 
                 if len(self.messages) == 3 and self.auto_gen_title_background_enable:
                     self.gen_title_messages.put(self.messages[1]['content'])
@@ -295,6 +315,51 @@ class ChatGPT:
             raise EOFError
 
         return reply_message
+
+    def handle_tool_calls(self, assistant_message: Dict[str, str]):
+        """Process a single round of tool calls and return the final assistant reply."""
+        tool_calls = assistant_message.get("tool_calls", [])
+        tool_results = []
+        for tool_call in tool_calls:
+            call_id = tool_call.get("id")
+            func = tool_call["function"]["name"]
+            args_raw = tool_call["function"].get("arguments", "{}")
+            try:
+                args = json.loads(args_raw) if args_raw else {}
+            except json.JSONDecodeError:
+                args = {}
+            handler = self.tool_handlers.get(func)
+            if handler:
+                try:
+                    result = handler(**args)
+                except Exception as e:
+                    result = {"error": str(e)}
+            else:
+                result = {"error": f"Tool '{func}' not implemented"}
+            tool_message = {
+                "role": "tool",
+                "tool_call_id": call_id,
+                "name": func,
+                "content": json.dumps(result)
+            }
+            self.messages.append(tool_message)
+            tool_results.append(tool_message)
+
+        followup = {
+            "model": self.model,
+            "messages": self.messages,
+            "temperature": self.temperature,
+            "tools": self.tools,
+            "tool_choice": "auto",
+            "stream": False
+        }
+        follow_response = self.send_request(followup, stream=False)
+        if follow_response is None:
+            return assistant_message
+        final_reply = self.process_response(follow_response, stream=False)
+        if final_reply:
+            self.messages.append(final_reply)
+        return final_reply or assistant_message
 
     def gen_title(self, force: bool = False):
         # Empty the title if there is only system message left
@@ -518,6 +583,62 @@ class ChatGPT:
         self.temperature = new_temperature
         console.print(_("gpt_term.temperature_set",temperature=temperature))
 
+    # --- Tools / skills ---
+    def register_builtin_tools(self):
+        """Register built-in minimal tools."""
+        self.tools.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_time",
+                    "description": "Get the current date and time in ISO 8601 format.",
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            }
+        )
+        self.tool_handlers["get_time"] = self.tool_get_time
+
+    def load_skill_dir(self):
+        """Dynamically load tools from skills/ directory (recursive).
+
+        Each skill file should export a dict `tool` (OpenAI tool schema)
+        and a callable `handle` that accepts **kwargs and returns JSON-serializable data.
+        """
+        if not skills_dir.exists():
+            return
+        for py_file in skills_dir.rglob("*.py"):
+            if py_file.name.startswith("_") or py_file.name.endswith("_test.py"):
+                continue
+            try:
+                if "tool" not in py_file.read_text():
+                    continue
+            except Exception:
+                continue
+            mod_name = py_file.stem
+            try:
+                spec = importlib.util.spec_from_file_location(mod_name, py_file)
+                if spec and spec.loader:
+                    module = importlib.util.module_from_spec(spec)
+                    sys.modules[mod_name] = module
+                    spec.loader.exec_module(module)
+                else:
+                    continue
+                tool_schema = getattr(module, "tool", None)
+                handler = getattr(module, "handle", None)
+                if not tool_schema or not handler:
+                    continue
+                func_name = tool_schema.get("function", {}).get("name")
+                if not func_name:
+                    continue
+                self.tools.append(tool_schema)
+                self.tool_handlers[func_name] = handler
+                log.debug(f"Skill loaded: {func_name} from {py_file}")
+            except Exception as e:
+                log.error(f"Failed to load skill {py_file}: {e}")
+
+    def tool_get_time(self):
+        return {"now": datetime.now().isoformat()}
+
 
 class CommandCompleter(Completer):
     def __init__(self):
@@ -624,12 +745,15 @@ temperature_validator = FloatRangeValidator(min_value=0.0, max_value=2.0)
 def print_message(message: Dict[str, str]):
     '''打印单条来自 ChatGPT 或用户的消息'''
     role = message["role"]
-    content = message["content"]
+    content = message.get("content")
     if role == "user":
         print(f"> {content}")
     elif role == "assistant":
         console.print("ChatGPT: ", end='', style="bold cyan")
-        if ChatMode.raw_mode:
+        # If assistant only returns tool calls with no content, skip markdown rendering
+        if content is None:
+            console.print("")
+        elif ChatMode.raw_mode:
             print(content)
         else:
             console.print(Markdown(content), new_line_start=True)
@@ -1168,6 +1292,12 @@ def main():
 
     multi_status = "[green]on[/]" if ChatMode.multi_line_mode else "off"
     console.print(f"[dim]Model: {provider}: [green]{chat_gpt.model}[/] | Multi-line mode: {multi_status}")
+    # Show loaded tools
+    if getattr(chat_gpt, "tools", None):
+        tool_names = [t.get("function", {}).get("name") for t in chat_gpt.tools if t.get("function")]
+        tool_names = [n for n in tool_names if n]
+        if tool_names:
+            console.print(f"[dim]Tools loaded: {', '.join(tool_names)}[/]")
 
     session = PromptSession()
 
