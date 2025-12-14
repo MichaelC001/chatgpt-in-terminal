@@ -137,6 +137,19 @@ class ChatGPT:
         self.register_builtin_tools()
         self.load_skill_dir()
 
+    def call_tool(self, name: str, args: Dict[str, object]):
+        """Call a loaded tool handler directly."""
+        handler = self.tool_handlers.get(name)
+        if not handler:
+            console.print(f"[red]Tool '{name}' not found[/]")
+            return None
+        try:
+            return handler(**args)
+        except Exception as e:
+            console.print(f"[red]Tool '{name}' failed: {e}[/]")
+            log.exception(e)
+            return None
+
     def add_total_tokens(self, tokens: int):
         self.threadlock_total_tokens_spent.acquire()
         self.total_tokens_spent += tokens
@@ -1313,6 +1326,18 @@ def main():
                 command = message.strip()
                 handle_command(command, chat_gpt,
                                key_bindings, chat_save_perfix)
+            elif message.startswith('@x'):
+                payload = message[len('@x'):].strip()
+                if not payload:
+                    console.print("[red]@x 需要后跟要发布的文本[/]")
+                    continue
+                result = chat_gpt.call_tool("x_post_thread", {"text": payload})
+                if result:
+                    urls = result.get("urls") or []
+                    if urls:
+                        console.print(f"[green]X posted:[/]\n" + "\n".join(urls))
+                    else:
+                        console.print(f"[green]X posted result:[/] {result}")
             else:
                 if not message:
                     continue

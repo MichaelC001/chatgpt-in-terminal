@@ -8,11 +8,19 @@ API_URL = "https://api.x.com/2/tweets"  # fallback domain also works: https://ap
 
 
 def _chunk_text(text: str, limit: int = MAX_TWEET_CHARS) -> List[str]:
-    """Split text into chunks <= limit, try to break on spaces."""
-    words = text.split()
+    """Split text into chunks <= limit. If a single token exceeds limit, hard-split it."""
+    cleaned = " ".join(text.split())  # collapse whitespace/newlines
+    words = cleaned.split(" ")
     chunks: List[str] = []
     current = ""
     for w in words:
+        # if token itself longer than limit, split it
+        while len(w) > limit:
+            head, w = w[:limit], w[limit:]
+            if current:
+                chunks.append(current)
+                current = ""
+            chunks.append(head)
         if not current:
             current = w
         elif len(current) + 1 + len(w) <= limit:
