@@ -17,6 +17,7 @@ from importlib.resources import read_text
 from pathlib import Path
 from queue import Queue
 from typing import Dict, List
+import shutil
 
 import pyperclip
 import requests
@@ -196,7 +197,8 @@ class ChatGPT:
         client = sseclient.SSEClient(response)
         with Live(console=console, auto_refresh=False, vertical_overflow=self.stream_overflow) as live:
             try:
-                rprint(f"[bold cyan]Einstein:[/] [dim]{label}[/]")
+                header = render_header_with_label("Einstein:", label)
+                console.print(header, style="bold cyan")
                 for event in client.events():
                     if event.data == '[DONE]':
                         # finish_reason = part["choices"][0]['finish_reason']
@@ -722,6 +724,15 @@ def next_label(role: str) -> str:
     return f"{prefix}{message_counters[role]}"
 
 
+def render_header_with_label(prefix: str, label: str) -> str:
+    """Render prefix and right-aligned label on the same line."""
+    width = shutil.get_terminal_size((80, 20)).columns
+    label_plain = label
+    prefix_len = len(prefix)
+    pad = max(1, width - prefix_len - len(label_plain))
+    return f"{prefix}{' ' * pad}[grey30]{label}[/]"
+
+
 def normalize_model_for_host(model: str, host: str) -> str:
     """Adjust model naming based on provider host to avoid invalid IDs."""
     if not model:
@@ -762,11 +773,11 @@ def print_message(message: Dict[str, str]):
     role = message["role"]
     content = message.get("content")
     if role == "user":
-        label = next_label("user")
-        print(f"> {content} [dim]{label}[/]")
+        print(f"> {content}")
     elif role == "assistant":
         label = next_label("assistant")
-        console.print(f"Einstein: [dim]{label}[/]", style="bold cyan")
+        header = render_header_with_label("Einstein:", label)
+        console.print(header, style="bold cyan")
         # If assistant only returns tool calls with no content, skip markdown rendering
         if content is None:
             console.print("")
@@ -821,6 +832,26 @@ def copy_code(message: Dict[str, str], select_code_idx: int = None):
     pyperclip.copy(''.join(selected_code[bpos+1:epos-1]))
     # erase code begin and end sign
     console.print(_("gpt_term.code_copy"))
+
+
+def find_assistant_message_by_label(messages: List[Dict[str, str]], label: str):
+    """Find assistant message by label like A1/A2 (case-insensitive)."""
+    label = label.strip().upper()
+    if not label.startswith("A"):
+        return None
+    # labels are assigned sequentially; we can infer index
+    try:
+        idx = int(label[1:])  # 1-based
+    except ValueError:
+        return None
+    # Iterate assistant messages and find nth
+    count = 0
+    for msg in messages:
+        if msg.get("role") == "assistant":
+            count += 1
+            if count == idx:
+                return msg
+    return None
 
 
 def change_CLI_title(new_title: str):
@@ -901,7 +932,14 @@ def handle_command(command: str, chat_gpt: ChatGPT, key_bindings: KeyBindings, c
         args = command.split()
         reply = chat_gpt.messages[-1]
         if len(args) > 1:
-            if args[1] == 'all':
+            if args[1].upper().startswith("A"):
+                target = find_assistant_message_by_label(chat_gpt.messages, args[1])
+                if target and target.get("content"):
+                    pyperclip.copy(target["content"])
+                    console.print(_("gpt_term.code_last_copy"))
+                else:
+                    console.print(_("gpt_term.code_copy_fail"))
+            elif args[1] == 'all':
                 pyperclip.copy(reply["content"])
                 console.print(_("gpt_term.code_last_copy"))
             elif args[1] == 'code':
