@@ -66,6 +66,7 @@ style = Style.from_dict({
 remote_version = None
 local_version = parse_version(__version__)
 threadlock_remote_version = threading.Lock()
+message_counters = {"user": 0, "assistant": 0}
 
 
 class ChatMode:
@@ -191,10 +192,12 @@ class ChatGPT:
 
     def process_stream_response(self, response: requests.Response):
         reply: str = ""
+        label = next_label("assistant")
         client = sseclient.SSEClient(response)
         with Live(console=console, auto_refresh=False, vertical_overflow=self.stream_overflow) as live:
             try:
-                rprint("[bold cyan]Einstein: ")
+                rprint("[bold cyan]Einstein: ", end="")
+                rprint("")
                 for event in client.events():
                     if event.data == '[DONE]':
                         # finish_reason = part["choices"][0]['finish_reason']
@@ -211,6 +214,7 @@ class ChatGPT:
                 live.stop()
                 console.print(_('gpt_term.Aborted'))
             finally:
+                rprint(f" [dim]{label}[/]")
                 return {'role': 'assistant', 'content': reply}
 
     def process_response(self, response: requests.Response, stream=None):
@@ -250,6 +254,8 @@ class ChatGPT:
         self.title = None
         # recount current tokens
         self.current_tokens = count_token(self.messages)
+        message_counters["user"] = 0
+        message_counters["assistant"] = 0
         console.print(_('gpt_term.delete_all'))
         console.print(_("gpt_term.spent_token", total_tokens_spent=self.total_tokens_spent))
         console.print("-" * 40)
@@ -709,6 +715,15 @@ def count_token(messages: List[Dict[str, str]]):
     return length
 
 
+def next_label(role: str) -> str:
+    """Return next label like Q1/A1 and increment counter."""
+    if role not in message_counters:
+        return ""
+    message_counters[role] += 1
+    prefix = "Q" if role == "user" else "A"
+    return f"{prefix}{message_counters[role]}"
+
+
 def normalize_model_for_host(model: str, host: str) -> str:
     """Adjust model naming based on provider host to avoid invalid IDs."""
     if not model:
@@ -749,16 +764,19 @@ def print_message(message: Dict[str, str]):
     role = message["role"]
     content = message.get("content")
     if role == "user":
-        print(f"> {content}")
+        label = next_label("user")
+        print(f"> {content} [dim]{label}[/]")
     elif role == "assistant":
         console.print("Einstein: ", end='', style="bold cyan")
         # If assistant only returns tool calls with no content, skip markdown rendering
         if content is None:
-            console.print("")
+            console.print(f"[dim]{next_label('assistant')}[/]")
         elif ChatMode.raw_mode:
-            print(content)
+            label = next_label("assistant")
+            print(f"{content} [dim]{label}[/]")
         else:
-            console.print(Markdown(content), new_line_start=True)
+            label = next_label("assistant")
+            console.print(Markdown(f"{content}\n\n[dim]{label}[/]"), new_line_start=True)
 
 
 def copy_code(message: Dict[str, str], select_code_idx: int = None):
