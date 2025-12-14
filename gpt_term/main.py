@@ -196,8 +196,7 @@ class ChatGPT:
         client = sseclient.SSEClient(response)
         with Live(console=console, auto_refresh=False, vertical_overflow=self.stream_overflow) as live:
             try:
-                rprint("[bold cyan]Einstein: ", end="")
-                rprint("")
+                rprint(f"[bold cyan]Einstein:[/] [dim]{label}[/]")
                 for event in client.events():
                     if event.data == '[DONE]':
                         # finish_reason = part["choices"][0]['finish_reason']
@@ -214,7 +213,6 @@ class ChatGPT:
                 live.stop()
                 console.print(_('gpt_term.Aborted'))
             finally:
-                rprint(f" [dim]{label}[/]")
                 return {'role': 'assistant', 'content': reply}
 
     def process_response(self, response: requests.Response, stream=None):
@@ -767,16 +765,15 @@ def print_message(message: Dict[str, str]):
         label = next_label("user")
         print(f"> {content} [dim]{label}[/]")
     elif role == "assistant":
-        console.print("Einstein: ", end='', style="bold cyan")
+        label = next_label("assistant")
+        console.print(f"Einstein: [dim]{label}[/]", style="bold cyan")
         # If assistant only returns tool calls with no content, skip markdown rendering
         if content is None:
-            console.print(f"[dim]{next_label('assistant')}[/]")
+            console.print("")
         elif ChatMode.raw_mode:
-            label = next_label("assistant")
-            print(f"{content} [dim]{label}[/]")
+            print(content)
         else:
-            label = next_label("assistant")
-            console.print(Markdown(f"{content}\n\n[dim]{label}[/]"), new_line_start=True)
+            console.print(Markdown(content), new_line_start=True)
 
 
 def copy_code(message: Dict[str, str], select_code_idx: int = None):
