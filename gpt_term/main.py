@@ -250,7 +250,6 @@ class ChatGPT:
         self.title = None
         # recount current tokens
         self.current_tokens = count_token(self.messages)
-        os.system('cls' if os.name == 'nt' else 'clear')
         console.print(_('gpt_term.delete_all'))
 
     def handle_simple(self, message: str):
