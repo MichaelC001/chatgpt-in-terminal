@@ -70,7 +70,7 @@ threadlock_remote_version = threading.Lock()
 
 class ChatMode:
     raw_mode = False
-    multi_line_mode = False
+    multi_line_mode = False  # default off
     stream_mode = True
 
     @classmethod
