@@ -27,6 +27,11 @@ Mentions/skills: you can surface behaviors via Markdown instructions or executab
 
 Input routing: the CLI first checks for local commands/mentions and runs them locally (e.g., `@memo ...` executes the memo CLI directly, bypassing the model). Only inputs that aren’t handled locally are sent to the model.
 
+Routing rules (summary):
+- `/...` slash commands and `@...` mentions are handled locally first.
+- Examples: `@memo ...` runs the memo CLI; `@x ...` posts to X; both return output to the UI without touching the model or chat history.
+- Ordinary text that doesn’t match local handlers is sent to the model and recorded in the conversation history.
+
 ### Related Projects
 
 [GPTerm implemented in C/C++](https://github.com/Ace-Radom/cGPTerm) by @Ace-Radom
