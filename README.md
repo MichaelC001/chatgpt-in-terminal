@@ -23,6 +23,8 @@ Includes a minimal OpenAI tool-calling (“skills”) example: the built-in `get
 
 Dynamic skills: drop a `.py` file into `skills/` exporting `tool` (OpenAI tool schema) and `handle(**kwargs)` (returns JSON-serializable data). It will be auto-loaded at startup.
 
+Mentions/skills: you can surface behaviors via Markdown instructions or executable Python tools. Markdown prompts help guide the model but require an extra reasoning round; Python tools (`tool` + `handle`) run directly and are faster to execute (e.g., `@x` uses the `x_post_thread` tool).
+
 ### Related Projects
 
 [GPTerm implemented in C/C++](https://github.com/Ace-Radom/cGPTerm) by @Ace-Radom
