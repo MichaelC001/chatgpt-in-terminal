@@ -1283,6 +1283,9 @@ def main():
             chat_gpt.handle_simple(query_text)
         return
 
+    # Ensure multi-line default off unless explicitly toggled
+    ChatMode.multi_line_mode = False
+
     # Display startup info
     if "openrouter" in chat_gpt.host:
         provider = "openrouter"
@@ -1293,12 +1296,6 @@ def main():
 
     multi_status = "[green]on[/]" if ChatMode.multi_line_mode else "off"
     console.print(f"[dim]Model: {provider}: [green]{chat_gpt.model}[/] | Multi-line mode: {multi_status}")
-    # Show loaded tools
-    if getattr(chat_gpt, "tools", None):
-        tool_names = [t.get("function", {}).get("name") for t in chat_gpt.tools if t.get("function")]
-        tool_names = [n for n in tool_names if n]
-        if tool_names:
-            console.print(f"[dim]Tools loaded: {', '.join(tool_names)}[/]")
 
     session = PromptSession()
 
