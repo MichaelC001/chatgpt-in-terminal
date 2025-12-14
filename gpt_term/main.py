@@ -251,6 +251,8 @@ class ChatGPT:
         # recount current tokens
         self.current_tokens = count_token(self.messages)
         console.print(_('gpt_term.delete_all'))
+        console.print(_("gpt_term.spent_token", total_tokens_spent=self.total_tokens_spent))
+        console.print("-" * 40)
 
     def handle_simple(self, message: str):
         self.messages.append({"role": "user", "content": message})
