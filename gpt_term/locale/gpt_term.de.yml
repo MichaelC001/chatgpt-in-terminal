@@ -12,11 +12,11 @@ de:
   load_chat_history: "[dim]Chatverlauf erfolgreich von [deep_sky_blue3]%{load} geladen"
   #
   code_not_found: "[dim]Code nicht gefunden"
-  code_too_many_found: "[dim]Es gibt mehr als einen Code in der letzten Antwort des ChatGPTs"
+  code_too_many_found: "[dim]Es gibt mehr als einen Code in der letzten Antwort von Einstein"
   code_num: "[yellow]Code %{code_num}: "
   code_select: "Bitte wählen den Code zu kopieren aus: "
   code_index_must_int: "[red]Der Index der Codes muss eine ganze Zahl sein"
-  code_index_out_range_one: "[red]Index außer Reichweite: Es gibt nur einen Code in der letzten Antwort des ChatGPTs"
+  code_index_out_range_one: "[red]Index außer Reichweite: Es gibt nur einen Code in der letzten Antwort von Einstein"
   code_index_out_range_many: "[red]Index außer Reichweite: Bitte eine ganze Zahl zwischen 1 und %{len_code_list} eingeben"
   code_copy: "[dim]Der Code wurde schon in die Zwischenablage kopiert"
   code_last_copy: "[dim]Letzte Antwort wurde schon in die Zwischenablage kopiert"
@@ -49,7 +49,7 @@ de:
   multi_line_enable: "[dim]Multi-Linie-Mode [green]aktiviert[/], pressen [[deep_sky_blue3]Esc[/]] + [[deep_sky_blue3]ENTER[/]] einzureichen."
   multi_line_disabled: "[dim]Multi-Linie-Mode [bright_red]deaktiviert[/]."
   #
-  ChatGPT_thinking: "[bold cyan]ChatGPT denkt nach..."
+  ChatGPT_thinking: "[bold cyan]Einstein denkt nach..."
   #
   Aborted: "[bold cyan]Abbrechen."
   Error_message: "[red]Fehler: %{error_msg}"
@@ -108,7 +108,7 @@ de:
   upgrade_use_command: "Verwenden `pip install --upgrade gpt-term` zum Upgrade."
   upgrade_see_git: "Sehen unsere [GitHub Site](https://github.com/xiaoxx970/chatgpt-in-terminal) um zu sehen, was geändert wurde!"
   #
-  help_description: "Verwenden ChatGPT im Terminal"
+  help_description: "Verwenden Einstein im Terminal"
   help_help: "Zeigt diese Hilfemeldung an und beendet sich"
   help_v: "Zeigt die Version des Programms an und beenden"
   help_load: "Chatverlauf aus Datei laden"

@@ -194,7 +194,7 @@ class ChatGPT:
         client = sseclient.SSEClient(response)
         with Live(console=console, auto_refresh=False, vertical_overflow=self.stream_overflow) as live:
             try:
-                rprint("[bold cyan]ChatGPT: ")
+                rprint("[bold cyan]Einstein: ")
                 for event in client.events():
                     if event.data == '[DONE]':
                         # finish_reason = part["choices"][0]['finish_reason']
@@ -298,7 +298,7 @@ class ChatGPT:
                 self.add_total_tokens(self.current_tokens)
 
                 if final_reply and 'content' in final_reply:
-                    log.info(f"ChatGPT: {final_reply['content']}")
+                    log.info(f"Einstein: {final_reply['content']}")
 
                 if len(self.messages) == 3 and self.auto_gen_title_background_enable:
                     self.gen_title_messages.put(self.messages[1]['content'])
@@ -750,7 +750,7 @@ def print_message(message: Dict[str, str]):
     if role == "user":
         print(f"> {content}")
     elif role == "assistant":
-        console.print("ChatGPT: ", end='', style="bold cyan")
+        console.print("Einstein: ", end='', style="bold cyan")
         # If assistant only returns tool calls with no content, skip markdown rendering
         if content is None:
             console.print("")

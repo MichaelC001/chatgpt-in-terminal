@@ -12,11 +12,11 @@ jp:
   load_chat_history: "[dim]チャット履歴が正常に読み込まれました：[deep_sky_blue3]%{load}"
   #
   code_not_found: "[dim]コードが見つかりません"
-  code_too_many_found: "[dim]ChatGPTの前回の返信には複数のコードがあります"
+  code_too_many_found: "[dim]Einsteinの前回の返信には複数のコードがあります"
   code_num: "[yellow]コード%{code_num}:"
   code_select: "コピーするコードを選択してください："
   code_index_must_int: "[red]コードインデックスは整数である必要があります"
-  code_index_out_range_one: "[red]インデックスが範囲外です：ChatGPTの前回の返信にはコードが1つしかありません"
+  code_index_out_range_one: "[red]インデックスが範囲外です：Einsteinの前回の返信にはコードが1つしかありません"
   code_index_out_range_many: "[red]インデックスが範囲外です：1〜%{len_code_list}の範囲内の整数を入力する必要があります"
   code_copy: "[dim]コードがクリップボードにコピーされました"
   code_last_copy: "[dim]前回の返信がクリップボードにコピーされました"
@@ -49,7 +49,7 @@ jp:
   multi_line_enabled: "[dim][green]マルチラインモードが有効になりました[/]、[[deep_sky_blue3]Esc[/]] + [[deep_sky_blue3]ENTER[/]]を押して送信してください。"
   multi_line_disabled: "[dim][bright_red]マルチラインモードが無効になりました[/]。"
   #
-  ChatGPT_thinking: "[bold cyan]ChatGPTが考え中です...[/]"
+  ChatGPT_thinking: "[bold cyan]Einsteinが考え中です...[/]"
   #
   Aborted: "[bold cyan]中止されました。"
   Error_message: "[red]エラー： %{error_msg}"
@@ -108,7 +108,7 @@ jp:
   upgrade_use_command: "`pip install --upgrade gpt-term`\nを使用してアップグレードしてください。"
   upgrade_see_git: "変更内容を確認するには、[GitHubサイト](https://github.com/xiaoxx970/chatgpt-in-terminal)を訪問してください！"
   #
-  help_description: "ターミナルでChatGPTを使用する"
+  help_description: "ターミナルでEinsteinを使用する"
   help_help: "このヘルプメッセージを表示して終了する"
   help_v: "プログラムのバージョン番号を表示して終了する"
   help_load: "チャット履歴をファイルから読み込む"
@@ -133,14 +133,14 @@ jp:
   help_mean_command: "`[deep_sky_blue3]%{most_similar_command}[/]`を意味しますか？"
   help_text: |
     [bold]利用可能なコマンド：[/]
-      /raw                     - ローモードを切り替える（ChatGPTの応答の生のテキストを表示する）
+      /raw                     - ローモードを切り替える（Einsteinの応答の生のテキストを表示する）
       /multi                   - マルチラインモードを切り替える（複数行の入力を許可する）
       /stream \[overflow_mode]  - ストリーム出力モードを切り替える（回答を流れるように表示する）
       /tokens                  - 使用されたトークンの総数と現在の会話のトークン数を表示する
       /usage                   - 使用済みの総クレジットと現在のクレジットを表示する
-      /last                    - 最後のChatGPTの応答を表示する
-      /copy (all)              - ChatGPTの最後の応答（生）をクリップボードにコピーする
-      /copy code \[index]       - ChatGPTの最後の応答内のコードをクリップボードにコピーする
+      /last                    - 最後のEinsteinの応答を表示する
+      /copy (all)              - Einsteinの最後の応答（生）をクリップボードにコピーする
+      /copy code \[index]       - Einsteinの最後の応答内のコードをクリップボードにコピーする
       /save \[filename_or_path] - チャット履歴をファイルに保存する。filename_or_pathが指定されていない場合は、タイトルを提案します
       /model \[model_name]      - AIモデルを変更する
       /system \[new_prompt]     - システムプロンプトを変更する
