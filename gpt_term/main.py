@@ -40,12 +40,12 @@ from . import __version__
 from .locale import set_lang, get_lang
 import locale
 
-data_dir = Path.home() / '.gpt-term'
+root_dir = Path(__file__).parent.parent
+data_dir = root_dir / 'data'
 data_dir.mkdir(parents=True, exist_ok=True)
-config_path = data_dir / 'config.ini'
+config_path = root_dir / 'config.ini'
 if not config_path.exists():
-    with config_path.open('w') as f:
-        f.write(read_text('gpt_term', 'config.ini'))
+    config_path.write_text(read_text('gpt_term', 'config.ini'))
 
 # 日志记录到 chat.log，注释下面这行可不记录日志
 logging.basicConfig(filename=f'{data_dir}/chat.log', format='%(asctime)s %(name)s: %(levelname)-6s %(message)s',
@@ -88,13 +88,14 @@ class ChatMode:
                 _("gpt_term.stream_mode_disabled"))
 
     @classmethod
-    def toggle_multi_line_mode(cls):
+    def toggle_multi_line_mode(cls, silent: bool = False):
         cls.multi_line_mode = not cls.multi_line_mode
-        if cls.multi_line_mode:
-            console.print(
-                _("gpt_term.multi_line_enabled"))
-        else:
-            console.print(_("gpt_term.multi_line_disabled"))
+        if not silent:
+            if cls.multi_line_mode:
+                console.print(
+                    _("gpt_term.multi_line_enabled"))
+            else:
+                console.print(_("gpt_term.multi_line_disabled"))
 
 
 class ChatGPT:
@@ -263,6 +264,7 @@ class ChatGPT:
                 "stream": ChatMode.stream_mode,
                 "temperature": self.temperature
             }
+            log.debug(f"Sending request with model: {self.model}, endpoint: {self.endpoint}")
             response = self.send_request(data)
             if response is None:
                 self.messages.pop()
@@ -459,11 +461,12 @@ class ChatGPT:
             console.print(_("gpt_term.stream_overflow_no_changed",old_overflow=old_overflow))
         
 
-    def set_model(self, new_model: str):
+    def set_model(self, new_model: str, silent: bool = False):
         old_model = self.model
         if not new_model:
-            console.print(
-                _("gpt_term.model_set"),old_model=old_model)
+            if not silent:
+                console.print(
+                    _("gpt_term.model_set"),old_model=old_model)
             return
         self.model = str(new_model)
         if "gpt-4-1106-preview" in self.model:
@@ -482,8 +485,18 @@ class ChatGPT:
             self.tokens_limit = 4096
         else:
             self.tokens_limit = float('nan')
-        console.print(
-            _("gpt_term.model_changed",old_model=old_model,new_model=new_model))
+
+        if not silent:
+            # Extract provider from host
+            if "openrouter" in self.host:
+                provider = "openrouter"
+            elif "api.openai.com" in self.host:
+                provider = "openai"
+            else:
+                provider = self.host.replace("https://", "").replace("http://", "").split("/")[0]
+
+            console.print(
+                _("gpt_term.model_changed",old_model=old_model,new_model=new_model,provider=provider))
 
     def set_timeout(self, timeout):
         try:
@@ -571,6 +584,16 @@ def count_token(messages: List[Dict[str, str]]):
     for message in messages:
         length += len(encoding.encode(str(message)))
     return length
+
+
+def normalize_model_for_host(model: str, host: str) -> str:
+    """Adjust model naming based on provider host to avoid invalid IDs."""
+    if not model:
+        return model
+    host = host or ""
+    if "api.openai.com" in host and model.startswith("openai/"):
+        return model.split("/", 1)[1]
+    return model
 
 
 class NumberValidator(Validator):
@@ -950,7 +973,7 @@ def get_remote_version():
 
 
 def write_config(config_ini: ConfigParser):
-    with open(f'{data_dir}/config.ini', 'w') as configfile:
+    with config_path.open('w') as configfile:
         config_ini.write(configfile)
 
 
@@ -991,7 +1014,7 @@ def main():
 
     # 读取配置文件
     config_ini = ConfigParser()
-    config_ini.read(f'{data_dir}/config.ini', encoding='utf-8')
+    config_ini.read(config_path, encoding='utf-8')
     config = config_ini['DEFAULT']
 
     # 读取语言配置
@@ -1054,19 +1077,22 @@ def main():
     log.debug("Remote version get thread started")
     # try to get remote version and check update
 
-    # if 'key' arg triggered, load the api key from config.ini with the given key-name;
-    # otherwise load the api key with the key-name "OPENAI_API_KEY"
+    # Determine target host and pick the matching default key name
+    target_host = args.host or config.get("OPENAI_HOST", "https://api.openai.com")
+    default_key_name = "OPENROUTER_API_KEY" if "openrouter" in target_host else "OPENAI_API_KEY"
+
+    # Load API key: explicit --key overrides; otherwise use provider-specific default
     if args.key:
         log.debug(f"Try loading API key with {args.key} from config.ini")
-        api_key = config.get(args.key)
+        api_key = os.environ.get(args.key) or config.get(args.key)
     else:
-        api_key = config.get("OPENAI_API_KEY")
+        api_key = os.environ.get(default_key_name) or config.get(default_key_name)
 
     if not api_key:
         log.debug("API Key not found, waiting for input")
         api_key = prompt(_("gpt_term.input_api_key"))
         if confirm(_("gpt_term.save_api_key"), suffix=" (y/N) "):
-            config["OPENAI_API_KEY"] = api_key
+            config[default_key_name] = api_key
             write_config(config_ini)
 
     api_key_log = api_key[:3] + '*' * (len(api_key) - 7) + api_key[-4:]
@@ -1079,11 +1105,14 @@ def main():
 
     chat_gpt = ChatGPT(api_key, api_timeout)
     
-    if config.get("OPENAI_HOST"):
-        chat_gpt.set_host(config.get("OPENAI_HOST"))
-    
+    if target_host:
+        chat_gpt.set_host(target_host)
+
     if config.get("OPENAI_MODEL"):
-        chat_gpt.set_model(config.get("OPENAI_MODEL"))
+        normalized_model = normalize_model_for_host(config.get("OPENAI_MODEL"), chat_gpt.host)
+        if normalized_model != config.get("OPENAI_MODEL"):
+            log.debug(f"Normalized model from {config.get('OPENAI_MODEL')} to {normalized_model} for host {chat_gpt.host}")
+        chat_gpt.set_model(normalized_model, silent=True)
 
     if not config.getboolean("AUTO_GENERATE_TITLE", True):
         chat_gpt.auto_gen_title_background_enable = False
@@ -1099,10 +1128,10 @@ def main():
         console.print(_("gpt_term.host_set", new_host=args.host))
 
     if args.model:
-        chat_gpt.set_model(args.model)
+        chat_gpt.set_model(args.model, silent=True)
 
     if args.multi:
-        ChatMode.toggle_multi_line_mode()
+        ChatMode.toggle_multi_line_mode(silent=True)
 
     if args.raw:
         ChatMode.toggle_raw_mode()
@@ -1128,8 +1157,17 @@ def main():
         else:  # Running in pipe/stream mode
             chat_gpt.handle_simple(query_text)
         return
+
+    # Display startup info
+    if "openrouter" in chat_gpt.host:
+        provider = "openrouter"
+    elif "api.openai.com" in chat_gpt.host:
+        provider = "openai"
     else:
-        console.print(_("gpt_term.welcome"))
+        provider = chat_gpt.host.replace("https://", "").replace("http://", "").split("/")[0]
+
+    multi_status = "[green]on[/]" if ChatMode.multi_line_mode else "off"
+    console.print(f"[dim]Model: {provider}: [green]{chat_gpt.model}[/] | Multi-line mode: {multi_status}")
 
     session = PromptSession()
 
@@ -1164,15 +1202,16 @@ def main():
     log.info(f"Total tokens spent: {chat_gpt.total_tokens_spent}")
     console.print(
         _("gpt_term.spent_token",total_tokens_spent=chat_gpt.total_tokens_spent))
-    
-    threadlock_remote_version.acquire()
-    if remote_version and remote_version > local_version:
-        console.print(Panel(Group(
-            Markdown(_("gpt_term.upgrade_use_command")),
-            Markdown(_("gpt_term.upgrade_see_git"))),
-            title=_("gpt_term.upgrade_title",local_version=str(local_version),remote_version=str(remote_version)),
-            width=58, style="blue", title_align="left"))
-    threadlock_remote_version.release()
+
+    # Disabled version check notification
+    # threadlock_remote_version.acquire()
+    # if remote_version and remote_version > local_version:
+    #     console.print(Panel(Group(
+    #         Markdown(_("gpt_term.upgrade_use_command")),
+    #         Markdown(_("gpt_term.upgrade_see_git"))),
+    #         title=_("gpt_term.upgrade_title",local_version=str(local_version),remote_version=str(remote_version)),
+    #         width=58, style="blue", title_align="left"))
+    # threadlock_remote_version.release()
 
 if __name__ == "__main__":
     main()
